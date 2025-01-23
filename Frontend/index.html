@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assistant AI de santé</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="png" href="logo.png">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Open+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+    
+</head>
+<body>
+    <header>
+        <img src="lgg.PNG" alt="HealthBot Logo">
+        <h1></h1>
+    </header>
+
+    <div class="chat-container" id="chatContainer">
+        <div id="welcomeImageContainer">
+            <img src="wl (2).PNG" alt="HealthBot Welcome" id="welcomeImage">
+        </div>
+        <div class="message ai">Bonjour ! Comment puis-je vous aider avec votre santé aujourd'hui ?</div>
+    </div>
+    
+
+
+    <div class="input-container">
+        <textarea id="userInput" placeholder="Tapez votre message ici..."></textarea>
+        <button onclick="sendMessage()">Envoyer</button>
+    </div>
+
+    <script>
+        document.getElementById('userInput').addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' && !event.shiftKey) { 
+                event.preventDefault(); 
+                sendMessage(); 
+            }
+        });
+
+
+        async function sendMessage() {
+        const userInput = document.getElementById('userInput');
+        const chatContainer = document.getElementById('chatContainer');
+        const welcomeImageContainer = document.getElementById('welcomeImageContainer');
+
+        if (userInput.value.trim() === '') {
+            return;
+        }
+
+        const userMessage = document.createElement('div');
+        userMessage.classList.add('message', 'user');
+        userMessage.textContent = userInput.value;
+        chatContainer.appendChild(userMessage);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+
+        const userMessageText = userInput.value;
+        userInput.value = ''; 
+
+        try {
+            const response = await fetch('http://127.0.0.1:8999/predict', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ symptoms: userMessageText.split(' ')}),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const aiMessage = document.createElement('div');
+                aiMessage.classList.add('message', 'ai');
+                aiMessage.textContent = data.response; 
+                chatContainer.appendChild(aiMessage);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            } else {
+                throw new Error('Failed to fetch response from the server.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            const errorMessage = document.createElement('div');
+            errorMessage.classList.add('message', 'ai', 'error');
+            errorMessage.textContent = "Une erreur est survenue. Veuillez réessayer.";
+            chatContainer.appendChild(errorMessage);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    }
+
+    </script>
+</body>
+</html>

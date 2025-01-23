@@ -1,46 +1,29 @@
-# from fastapi import FastAPI
-#
-# app = FastAPI()
-#
-#
-# @app.get("/")
-# async def root():
-#     return {"message": "Hello World"}
-#
-#
-# @app.get("/hello/{name}")
-# async def say_hello(name: str):
-#     return {"message": f"Hello {name}"}
-
-
+import pickle
+import numpy as np
 from fastapi import FastAPI
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import chatbot
+from app.models import SymptomInput
 
+with open("app/decision_tree_classifier.pkl", "rb") as f:
+    decision_tree_model_pkl = pickle.load(f)
+    print(decision_tree_model_pkl)
 app = FastAPI(
     title="Project 3 - Healthcare ChatBot",
     description="This is a Healthcare ChatBot API",
     version="1.0.0",
-    docs_url=None  # Disable default Swagger docs endpoint
+    docs_url=None
 )
-# app.add_middleware(BaseHTTPMiddleware, dispatch=log_middleware)
 
 # Configuration CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Autorise toutes les origines
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Autorise toutes les méthodes
-    allow_headers=["*"],  # Autorise tous les headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-app.include_router(chatbot.router)
-
-
-# @app.get("/")
-# def read_root():
-#     return {"message": "Welcome to the Healthcare ChatBot API"}
 
 # ReDoc will be displayed by default
 @app.get("/", include_in_schema=False)
@@ -52,6 +35,23 @@ async def redoc():
 @app.get("/docs", include_in_schema=False)
 async def swagger_docs():
     return get_swagger_ui_html(openapi_url="/openapi.json", title="Swagger - Auth Service")
+
+
+@app.post("/predict")
+def predict_disease(symptom_input: SymptomInput):
+    # Here, you would process the symptom data (e.g., convert to a feature vector)
+    # For simplicity, we'll assume the model uses the number of symptoms as a feature:
+    num_symptoms = len(symptom_input.symptoms)
+
+    # Create feature array (example, modify based on your actual model input)
+    input_data = np.array([[num_symptoms]])  # Assuming the model takes the number of symptoms
+
+    # Make prediction
+    prediction = decision_tree_model_pkl.predict(input_data)
+
+    # Return the prediction
+    return {"prediction": int(prediction[0])}
+    # return {"message": f"Hello World{symptom_input.symptoms}"}
 
 
 if __name__ == "__main__":
