@@ -1,3 +1,18 @@
+# from fastapi import FastAPI
+#
+# app = FastAPI()
+#
+#
+# @app.get("/")
+# async def root():
+#     return {"message": "Hello World"}
+#
+#
+# @app.get("/hello/{name}")
+# async def say_hello(name: str):
+#     return {"message": f"Hello {name}"}
+
+
 from fastapi import FastAPI
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,6 +37,12 @@ app.add_middleware(
 
 app.include_router(chatbot.router)
 
+
+# @app.get("/")
+# def read_root():
+#     return {"message": "Welcome to the Healthcare ChatBot API"}
+
+# ReDoc will be displayed by default
 @app.get("/", include_in_schema=False)
 async def redoc():
     return get_redoc_html(openapi_url="/openapi.json", title="ReDoc - Auth Service")
