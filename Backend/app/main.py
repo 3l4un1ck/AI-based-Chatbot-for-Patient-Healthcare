@@ -1,60 +1,82 @@
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 import pickle
 import numpy as np
-from fastapi import FastAPI
-from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+import pandas as pd
 from fastapi.middleware.cors import CORSMiddleware
-from app.models import SymptomInput
 
-with open("app/decision_tree_classifier.pkl", "rb") as f:
-    decision_tree_model_pkl = pickle.load(f)
-    print(decision_tree_model_pkl)
-app = FastAPI(
-    title="Project 3 - Healthcare ChatBot",
-    description="This is a Healthcare ChatBot API",
-    version="1.0.0",
-    docs_url=None
-)
+# Initialize FastAPI app
+app = FastAPI(title="Disease Prediction API", version="1.0")
 
-# Configuration CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Autoriser toutes les origines (à adapter en production)
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Autoriser toutes les méthodes (GET, POST, OPTIONS, etc.)
+    allow_headers=["*"],  # Autoriser tous les en-têtes
 )
 
-
-# ReDoc will be displayed by default
-@app.get("/", include_in_schema=False)
-async def redoc():
-    return get_redoc_html(openapi_url="/openapi.json", title="ReDoc - Auth Service")
-
-
-# Swagger docs at /docs
-@app.get("/docs", include_in_schema=False)
-async def swagger_docs():
-    return get_swagger_ui_html(openapi_url="/openapi.json", title="Swagger - Auth Service")
+# Load the model
+def load_model():
+    with open("app/decision_tree_classifier.pkl", "rb") as file:
+        model = pickle.load(file)
+    return model
 
 
-@app.post("/predict")
-def predict_disease(symptom_input: SymptomInput):
-    # Here, you would process the symptom data (e.g., convert to a feature vector)
-    # For simplicity, we'll assume the model uses the number of symptoms as a feature:
-    num_symptoms = len(symptom_input.symptoms)
+model = load_model()
 
-    # Create feature array (example, modify based on your actual model input)
-    input_data = np.array([[num_symptoms]])  # Assuming the model takes the number of symptoms
-
-    # Make prediction
-    prediction = decision_tree_model_pkl.predict(input_data)
-
-    # Return the prediction
-    return {"prediction": int(prediction[0])}
-    # return {"message": f"Hello World{symptom_input.symptoms}"}
+# Load symptoms list
+training_data = pd.read_csv("app/Data/Training.csv")
+symptom_list = training_data.columns[:-1].tolist()  # Symptom names
+prognosis_list = training_data['prognosis'].unique().tolist()  # Possible diagnoses
 
 
-if __name__ == "__main__":
-    import uvicorn
+# Pydantic model for input validation
+class SymptomInput(BaseModel):
+    symptoms: list[str]
 
-    uvicorn.run(app, host="0.0.0.0", port=8999)
+
+# Root endpoint
+@app.get("/")
+def root():
+    return {"message": "Welcome to the Disease Prediction API!"}
+
+
+# Endpoint to get all symptoms
+@app.get("/symptoms/")
+def get_symptoms():
+    return {"symptoms": symptom_list}
+
+
+# Endpoint to predict disease
+@app.post("/predict/")
+def predict_disease(input_data: SymptomInput):
+    # Validate input
+    user_symptoms = input_data.symptoms
+    if not user_symptoms:
+        raise HTTPException(status_code=400, detail="No symptoms provided.")
+
+    # Prepare input vector for the model
+    input_vector = np.zeros(len(symptom_list))
+    for symptom in user_symptoms:
+        if symptom not in symptom_list:
+            raise HTTPException(status_code=400, detail=f"Invalid symptom: {symptom}")
+        index = symptom_list.index(symptom)
+        input_vector[index] = 1
+
+    # Predict disease
+    prediction = model.predict([input_vector])[0]
+
+    # avec le rowPredict retrouver la bonne description
+    dfDescription = pd.read_csv("app/MasterData/symptom_Description.csv")
+    result = pd.Series(dfDescription.iloc[:, 1].values, index=dfDescription.iloc[:, 0]).to_dict()
+    try:
+        # Find the description for the predicted disease
+        description = result[prediction]
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Description not found for the predicted disease.")
+
+    return {
+        "predicted_disease": prediction,
+        "description": description,
+    }

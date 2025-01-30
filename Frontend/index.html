@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="style.css">
     <link rel="icon" type="png" href="logo.png">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Open+Sans:wght@300;400;600&display=swap" rel="stylesheet">
-    
 </head>
 <body>
     <header>
@@ -19,72 +18,118 @@
         <div id="welcomeImageContainer">
             <img src="wl (2).PNG" alt="HealthBot Welcome" id="welcomeImage">
         </div>
-        <div class="message ai">Bonjour ! Comment puis-je vous aider avec votre santé aujourd'hui ?</div>
+        <div class="message ai">Bonjour ! Quel est votre symptôme aujourd'hui ?</div>
     </div>
-    
-
 
     <div class="input-container">
         <textarea id="userInput" placeholder="Tapez votre message ici..."></textarea>
         <button onclick="sendMessage()">Envoyer</button>
+        <button onclick="resetConversation()" id="resetButton" style="display: none;">Recommencer</button>
     </div>
 
     <script>
+        let symptomsList = [];
+        let isAskingForSymptoms = true;
+
         document.getElementById('userInput').addEventListener('keydown', function (event) {
-            if (event.key === 'Enter' && !event.shiftKey) { 
-                event.preventDefault(); 
-                sendMessage(); 
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
             }
         });
 
 
         async function sendMessage() {
-        const userInput = document.getElementById('userInput');
-        const chatContainer = document.getElementById('chatContainer');
-        const welcomeImageContainer = document.getElementById('welcomeImageContainer');
+            const userInput = document.getElementById('userInput');
+            const chatContainer = document.getElementById('chatContainer');
+            const resetButton = document.getElementById('resetButton');
 
-        if (userInput.value.trim() === '') {
-            return;
-        }
-
-        const userMessage = document.createElement('div');
-        userMessage.classList.add('message', 'user');
-        userMessage.textContent = userInput.value;
-        chatContainer.appendChild(userMessage);
-        chatContainer.scrollTop = chatContainer.scrollHeight;
-
-        const userMessageText = userInput.value;
-        userInput.value = ''; 
-
-        try {
-            const response = await fetch('http://127.0.0.1:8999/predict', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ symptoms: userMessageText.split(' ')}),
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                const aiMessage = document.createElement('div');
-                aiMessage.classList.add('message', 'ai');
-                aiMessage.textContent = data.response; 
-                chatContainer.appendChild(aiMessage);
-                chatContainer.scrollTop = chatContainer.scrollHeight;
-            } else {
-                throw new Error('Failed to fetch response from the server.');
+            if (userInput.value.trim() === '') {
+                return;
             }
-        } catch (error) {
-            console.error('Error:', error);
-            const errorMessage = document.createElement('div');
-            errorMessage.classList.add('message', 'ai', 'error');
-            errorMessage.textContent = "Une erreur est survenue. Veuillez réessayer.";
-            chatContainer.appendChild(errorMessage);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-    }
 
+            const userMessage = document.createElement('div');
+            userMessage.classList.add('message', 'user');
+            userMessage.textContent = userInput.value;
+            chatContainer.appendChild(userMessage);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            const userMessageText = userInput.value.trim().toLowerCase();
+            userInput.value = '';
+
+            if (isAskingForSymptoms) {
+                if (userMessageText === 'non') {
+                    isAskingForSymptoms = false;
+                    if (symptomsList.length > 0) {
+                        const aiMessage = document.createElement('div');
+                        aiMessage.classList.add('message', 'ai');
+                        aiMessage.textContent = "Merci. Je vais analyser vos symptômes...";
+                        chatContainer.appendChild(aiMessage);
+                        chatContainer.scrollTop = chatContainer.scrollHeight;
+
+                        try {
+                            const response = await fetch('http://127.0.0.1:8999/predict/', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({ symptoms: symptomsList }),
+                            });
+
+                            if (response.ok) {
+                                const data = await response.json();
+
+                                // Afficher la maladie prédite
+                                const diseaseMessage = document.createElement('div');
+                                diseaseMessage.classList.add('message', 'ai');
+                                diseaseMessage.innerHTML = `<strong>Maladie prédite :</strong> ${data.predicted_disease}`;
+                                chatContainer.appendChild(diseaseMessage);
+
+                                // Afficher la description de la maladie
+                                const descriptionMessage = document.createElement('div');
+                                descriptionMessage.classList.add('message', 'ai');
+                                descriptionMessage.innerHTML = `<strong>Description :</strong> ${data.description}`;
+                                chatContainer.appendChild(descriptionMessage);
+
+                                // Afficher le bouton "Recommencer"
+                                resetButton.style.display = 'inline-block';
+
+                                chatContainer.scrollTop = chatContainer.scrollHeight;
+                            } else {
+                                throw new Error('Failed to fetch response from the server.');
+                            }
+                        } catch (error) {
+                            console.error('Error:', error);
+                            const errorMessage = document.createElement('div');
+                            errorMessage.classList.add('message', 'ai', 'error');
+                            errorMessage.textContent = "Une erreur est survenue. Veuillez réessayer.";
+                            chatContainer.appendChild(errorMessage);
+                            chatContainer.scrollTop = chatContainer.scrollHeight;
+                        }
+                    } else {
+                        const aiMessage = document.createElement('div');
+                        aiMessage.classList.add('message', 'ai');
+                        aiMessage.textContent = "Vous n'avez entré aucun symptôme. Veuillez réessayer.";
+                        chatContainer.appendChild(aiMessage);
+                        chatContainer.scrollTop = chatContainer.scrollHeight;
+                        isAskingForSymptoms = true;
+                    }
+                } else {
+                    symptomsList.push(userMessageText);
+                    const aiMessage = document.createElement('div');
+                    aiMessage.classList.add('message', 'ai');
+                    aiMessage.textContent = "Avez-vous d'autres symptômes ? (Si non, tapez 'non')";
+                    chatContainer.appendChild(aiMessage);
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }
+            } else {
+                // Handle other types of user input if needed
+            }
+        }
+
+        function resetConversation() {
+            location.reload();
+        }
     </script>
 </body>
 </html>

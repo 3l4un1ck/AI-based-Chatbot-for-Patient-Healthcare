@@ -15,7 +15,7 @@ def load_model():
 model = load_model()
 
 # Load symptom data (features)
-training_data = pd.read_csv("Data/Training.csv")
+training_data = pd.read_csv("app/Data/Training.csv")
 symptom_list = training_data.columns[:-1]  # Get symptom names
 prognosis_list = training_data['prognosis'].unique()  # Possible diagnoses
 
