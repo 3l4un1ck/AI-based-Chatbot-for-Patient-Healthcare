@@ -1,60 +1,93 @@
-# from fastapi import FastAPI
-#
-# app = FastAPI()
-#
-#
-# @app.get("/")
-# async def root():
-#     return {"message": "Hello World"}
-#
-#
-# @app.get("/hello/{name}")
-# async def say_hello(name: str):
-#     return {"message": f"Hello {name}"}
-
-
-from fastapi import FastAPI
-from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import pickle
+import numpy as np
+import pandas as pd
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import chatbot
 
-app = FastAPI(
-    title="Project 3 - Healthcare ChatBot",
-    description="This is a Healthcare ChatBot API",
-    version="1.0.0",
-    docs_url=None  # Disable default Swagger docs endpoint
-)
-# app.add_middleware(BaseHTTPMiddleware, dispatch=log_middleware)
+# Initialize FastAPI app
+app = FastAPI(title="Disease Prediction API", version="1.0")
 
-# Configuration CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Autorise toutes les origines
+    allow_origins=["*"],  # Autoriser toutes les origines (à adapter en production)
     allow_credentials=True,
-    allow_methods=["*"],  # Autorise toutes les méthodes
-    allow_headers=["*"],  # Autorise tous les headers
+    allow_methods=["*"],  # Autoriser toutes les méthodes (GET, POST, OPTIONS, etc.)
+    allow_headers=["*"],  # Autoriser tous les en-têtes
 )
 
-app.include_router(chatbot.router)
+# Load the model
+def load_model():
+    with open("app/decision_tree_classifier.pkl", "rb") as file:
+        model = pickle.load(file)
+    return model
 
 
-# @app.get("/")
-# def read_root():
-#     return {"message": "Welcome to the Healthcare ChatBot API"}
+model = load_model()
 
-# ReDoc will be displayed by default
-@app.get("/", include_in_schema=False)
-async def redoc():
-    return get_redoc_html(openapi_url="/openapi.json", title="ReDoc - Auth Service")
+# Load symptoms list
+training_data = pd.read_csv("app/Data/Training.csv")
+symptom_list = training_data.columns[:-1].tolist()  # Symptom names
+prognosis_list = training_data['prognosis'].unique().tolist()  # Possible diagnoses
 
 
-# Swagger docs at /docs
-@app.get("/docs", include_in_schema=False)
-async def swagger_docs():
-    return get_swagger_ui_html(openapi_url="/openapi.json", title="Swagger - Auth Service")
+# Pydantic model for input validation
+class SymptomInput(BaseModel):
+    symptoms: list[str]
 
 
-if __name__ == "__main__":
-    import uvicorn
+# Root endpoint
+@app.get("/")
+def root():
+    return {"message": "Welcome to the Disease Prediction API!"}
 
-    uvicorn.run(app, host="0.0.0.0", port=8999)
+
+# Endpoint to get all symptoms
+@app.get("/symptoms/")
+def get_symptoms():
+    return {"symptoms": symptom_list}
+
+
+# Endpoint to predict disease
+@app.post("/predict/")
+def predict_disease(input_data: SymptomInput):
+    # Validate input
+    user_symptoms = input_data.symptoms
+    if not user_symptoms:
+        raise HTTPException(status_code=400, detail="No symptoms provided.")
+
+    # Prepare input vector for the model
+    input_vector = np.zeros(len(symptom_list))
+    for symptom in user_symptoms:
+        if symptom not in symptom_list:
+            raise HTTPException(status_code=400, detail=f"Invalid symptom: {symptom}")
+        index = symptom_list.index(symptom)
+        input_vector[index] = 1
+
+    # Predict disease
+    prediction = model.predict([input_vector])[0]
+
+    # avec le rowPredict retrouver la bonne description
+    dfDescription = pd.read_csv("app/MasterData/symptom_Description.csv")
+    result = pd.Series(dfDescription.iloc[:, 1].values, index=dfDescription.iloc[:, 0]).to_dict()
+    try:
+        # Find the description for the predicted disease
+        description = result[prediction]
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Description not found for the predicted disease.")
+
+    # avec le pred on retrouve les précautions à prendre
+    dfPred = pd.read_csv("app/MasterData/symptom_precaution.csv")
+
+    dfPred.columns = ["Disease", "Precaution 1", "Precaution 2", "Precaution 3", "Precaution 4"]
+    dfPred.head()
+
+    row = dfPred[dfPred["Disease"] == prediction]
+    precautions = row.iloc[0, 1:].dropna().tolist()
+    print(precautions)
+
+    return {
+        "predicted_disease": prediction,
+        "description": description,
+        "precautions": precautions,
+    }

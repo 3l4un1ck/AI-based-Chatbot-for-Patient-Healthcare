@@ -1,6 +1,6 @@
 #dossier contenant les modèles
-data/
-MasterData/
+app/Data/
+app/MasterData/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
