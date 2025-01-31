@@ -76,7 +76,18 @@ def predict_disease(input_data: SymptomInput):
     except KeyError:
         raise HTTPException(status_code=404, detail="Description not found for the predicted disease.")
 
+    # avec le pred on retrouve les précautions à prendre
+    dfPred = pd.read_csv("app/MasterData/symptom_precaution.csv")
+
+    dfPred.columns = ["Disease", "Precaution 1", "Precaution 2", "Precaution 3", "Precaution 4"]
+    dfPred.head()
+
+    row = dfPred[dfPred["Disease"] == prediction]
+    precautions = row.iloc[0, 1:].dropna().tolist()
+    print(precautions)
+
     return {
         "predicted_disease": prediction,
         "description": description,
+        "precautions": precautions,
     }

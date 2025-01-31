@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Assistant AI de santé</title>
+    <title>Health AI Assistant</title>
     <link rel="stylesheet" href="style.css">
     <link rel="icon" type="png" href="logo.png">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Open+Sans:wght@300;400;600&display=swap" rel="stylesheet">
@@ -18,13 +18,13 @@
         <div id="welcomeImageContainer">
             <img src="wl (2).PNG" alt="HealthBot Welcome" id="welcomeImage">
         </div>
-        <div class="message ai">Bonjour ! Quel est votre symptôme aujourd'hui ?</div>
+        <div class="message ai">Hello! What is your symptom today?</div>
     </div>
 
     <div class="input-container">
-        <textarea id="userInput" placeholder="Tapez votre message ici..."></textarea>
-        <button onclick="sendMessage()">Envoyer</button>
-        <button onclick="resetConversation()" id="resetButton" style="display: none;">Recommencer</button>
+        <textarea id="userInput" placeholder="Type your message here..."></textarea>
+        <button onclick="sendMessage()">Send</button>
+        <button onclick="restartConversation()" id="restartButton" style="display: none;">Restart</button>
     </div>
 
     <script>
@@ -38,11 +38,10 @@
             }
         });
 
-
         async function sendMessage() {
             const userInput = document.getElementById('userInput');
             const chatContainer = document.getElementById('chatContainer');
-            const resetButton = document.getElementById('resetButton');
+            const restartButton = document.getElementById('restartButton');
 
             if (userInput.value.trim() === '') {
                 return;
@@ -58,12 +57,12 @@
             userInput.value = '';
 
             if (isAskingForSymptoms) {
-                if (userMessageText === 'non') {
+                if (userMessageText === 'no') {
                     isAskingForSymptoms = false;
                     if (symptomsList.length > 0) {
                         const aiMessage = document.createElement('div');
                         aiMessage.classList.add('message', 'ai');
-                        aiMessage.textContent = "Merci. Je vais analyser vos symptômes...";
+                        aiMessage.textContent = "Thank you. I am analyzing your symptoms...";
                         chatContainer.appendChild(aiMessage);
                         chatContainer.scrollTop = chatContainer.scrollHeight;
 
@@ -79,20 +78,33 @@
                             if (response.ok) {
                                 const data = await response.json();
 
-                                // Afficher la maladie prédite
+                                // Display the predicted disease
                                 const diseaseMessage = document.createElement('div');
                                 diseaseMessage.classList.add('message', 'ai');
-                                diseaseMessage.innerHTML = `<strong>Maladie prédite :</strong> ${data.predicted_disease}`;
+                                diseaseMessage.innerHTML = `<strong>Predicted Disease:</strong> ${data.predicted_disease}`;
                                 chatContainer.appendChild(diseaseMessage);
 
-                                // Afficher la description de la maladie
+                                // Display the disease description
                                 const descriptionMessage = document.createElement('div');
                                 descriptionMessage.classList.add('message', 'ai');
-                                descriptionMessage.innerHTML = `<strong>Description :</strong> ${data.description}`;
+                                descriptionMessage.innerHTML = `<strong>Description:</strong> ${data.description}`;
                                 chatContainer.appendChild(descriptionMessage);
 
-                                // Afficher le bouton "Recommencer"
-                                resetButton.style.display = 'inline-block';
+                                // Display the precautions
+                                if (data.precautions && data.precautions.length > 0) {
+                                    const precautionsMessage = document.createElement('div');
+                                    precautionsMessage.classList.add('message', 'ai');
+                                    precautionsMessage.innerHTML = `
+                                        <strong>Precautions:</strong>
+                                        <ul>
+                                            ${data.precautions.map(precaution => `<li>${precaution}</li>`).join('')}
+                                        </ul>
+                                    `;
+                                    chatContainer.appendChild(precautionsMessage);
+                                }
+
+                                // Show the "Restart" button
+                                restartButton.style.display = 'inline-block';
 
                                 chatContainer.scrollTop = chatContainer.scrollHeight;
                             } else {
@@ -102,14 +114,14 @@
                             console.error('Error:', error);
                             const errorMessage = document.createElement('div');
                             errorMessage.classList.add('message', 'ai', 'error');
-                            errorMessage.textContent = "Une erreur est survenue. Veuillez réessayer.";
+                            errorMessage.textContent = "An error occurred. Please try again.";
                             chatContainer.appendChild(errorMessage);
                             chatContainer.scrollTop = chatContainer.scrollHeight;
                         }
                     } else {
                         const aiMessage = document.createElement('div');
                         aiMessage.classList.add('message', 'ai');
-                        aiMessage.textContent = "Vous n'avez entré aucun symptôme. Veuillez réessayer.";
+                        aiMessage.textContent = "You did not enter any symptoms. Please try again.";
                         chatContainer.appendChild(aiMessage);
                         chatContainer.scrollTop = chatContainer.scrollHeight;
                         isAskingForSymptoms = true;
@@ -118,7 +130,7 @@
                     symptomsList.push(userMessageText);
                     const aiMessage = document.createElement('div');
                     aiMessage.classList.add('message', 'ai');
-                    aiMessage.textContent = "Avez-vous d'autres symptômes ? (Si non, tapez 'non')";
+                    aiMessage.textContent = "Do you have any other symptoms? (If not, type 'no')";
                     chatContainer.appendChild(aiMessage);
                     chatContainer.scrollTop = chatContainer.scrollHeight;
                 }
@@ -127,7 +139,8 @@
             }
         }
 
-        function resetConversation() {
+        function restartConversation() {
+            // Reload the page
             location.reload();
         }
     </script>
